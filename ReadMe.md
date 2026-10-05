@@ -5,8 +5,8 @@ A small programming language written in Java, built from scratch as a learning p
 The goal is to understand how a compiler front end works by building every stage by hand, without parser generators.
 
 Status
-Lexer (tokens, keywords, operators, line tracking, error reporting)
-AST (expression and statement nodes)
+Lexer (tokens, keywords, operators, line tracking, error reporting) x
+AST (expression and statement nodes) x
 Parser (recursive descent, operator precedence)
 Interpreter
 Test suite and example programs
@@ -22,7 +22,7 @@ n = n - 1;
 }
 print result;
 
-This is the target syntax. At the moment only the lexer is implemented, so programs can be tokenised but not yet parsed or run.
+This is the target syntax. At the moment the lexer and the AST node types are implemented, so programs can be tokenised but not yet parsed or run.
 
 The lexer
 
@@ -57,6 +57,21 @@ Keywords beat identifiers. A word is read as an identifier-shaped lexeme first, 
 Longest match. A word is read for as long as it continues to match, so ifthen is a single identifier rather than the keyword if followed by then.
 One character of lookahead. Operators that may be one or two characters (=/==, </<=, >/>=) are decided by peeking at the next character. A helper, match, consumes that character only when it is the expected one, so a failed check never swallows input.
 Single pass, left to right. The lexer never backtracks.
+The AST
+
+The parser will turn the flat token list into a tree. The tree nodes are defined as Java records inside two sealed interfaces, Expr (things that produce a value) and Stmt (things that perform an action).
+
+For example, 1 + 2 * 3 and (1 + 2) * 3 use the same tokens but give different trees:
+
+        +                    *
+       / \                  / \
+      1   *                +   3
+         / \              / \
+        2   3            1   2
+Design decisions
+No node for brackets. Grouping is recorded by the shape of the tree: whatever sits lower is evaluated first.
+Sealed interfaces. Every node kind is known up front, so the interpreter's switch can be checked for completeness.
+Operators are stored as tokens, so error messages can report the line they came from.
 Project structure
 src/main/java/org/example/toylang/
 Main.java        entry point
@@ -64,8 +79,10 @@ Lexer.java       source text -> list of tokens
 Token.java       a token: type, lexeme, line
 TokenType.java   all token types
 LangError.java   error type carrying a line number
+Expr.java        expression nodes
+Stmt.java        statement nodes
 
-The AST, parser and interpreter files will be added in the next stages.
+The parser and interpreter files will be added in the next stages.
 
 Building and running
 
@@ -80,7 +97,6 @@ From the command line, using the bundled Maven wrapper:
 (On Windows, use mvnw.cmd compile.)
 
 Roadmap
-AST: Expr and Stmt node types (numbers, variables, binary operations, assignment, print, if, while, blocks).
 Parser: recursive descent, with one method per grammar rule and one precedence level per rule.
 Interpreter: a tree-walking evaluator with a variable store.
 Tests: example programs with expected output, run by a single command.
