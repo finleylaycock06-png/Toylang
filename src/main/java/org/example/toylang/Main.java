@@ -1,27 +1,9 @@
 package org.example.toylang;
 
 public class Main {
-    public static void main(String[] args) {
-        Expr e = new Expr.Binary(
-                new Expr.Num(1),
-                        new Token(TokenType.PLUS, "+", 1),
-                  new Expr.Binary(
-                  new Expr.Num(2),
-                  new Token(TokenType.STAR, "*", 1),
-                        new Expr.Num(3)
-                )
-        );
-        System.out.println(e);
-        Expr e2 = new Expr.Binary(
-                new Expr.Binary(
-                        new Expr.Num(1),
-                        new Token(TokenType.PLUS, "+", 1),
-                        new Expr.Num(2)
-                ),
-                new Token(TokenType.STAR, "*", 1),
-                new Expr.Num(3)
-        );
-        System.out.println(e2);
+    public static void main(String[] args) {           // the program starts here
+        // lex the text into tokens, parse the tokens into a tree, then print the tree
+        System.out.println(new Parser(new Lexer("if (x < 1) print x; else print 0;").lex()).parse());
+        System.out.println(new Parser(new Lexer("if (x < 1) print x;").lex()).parse());
     }
-
 }
