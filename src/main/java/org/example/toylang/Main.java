@@ -5,10 +5,15 @@ import java.nio.file.Path;     // Path.of builds a file path
 
 public class Main {
     // throws an IOException: reading a file can fail (missing file), and Java makes us declare it
-    public static void main(String[] args) throws IOException {           // path is relative to the project root
+    public static void main(String[] args) throws IOException {// path is relative to the project root
+       if (args.length == 0) {   // nothing was passed in
+           System.err.println("Usage: toylang <file>");
+           return;               // stop here
+       }
+
         // lex the text into tokens, parse the tokens into a tree, then print the tree
         try {
-             String source = Files.readString(Path.of("programs/factorial.toy"));
+             String source = Files.readString(Path.of(args[0]));
              // the whole pipeline in one line, working inside out:
             // Lexer(source).lex()   text -> List<Token>
             // Parser(...).parse()   tokens -> List<Stmt>
