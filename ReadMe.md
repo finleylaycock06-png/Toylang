@@ -9,8 +9,8 @@ Lexer (tokens, keywords, operators, line tracking, error reporting)
 AST (expression and statement nodes)
 Parser (recursive descent, operator precedence, statements)
 Interpreter (tree-walking evaluator with a variable store)
-Runs programs from a file, with line-numbered error messages
-More example programs and a test suite
+Runs programs from a file given on the command line, with line-numbered error messages
+Example programs and an automated test suite (JUnit 5)
 Unary minus
 The language
 Arithmetic, variables, comparisons, if/else, while, blocks and print. Every statement ends with ;. All numbers are doubles.
@@ -25,12 +25,12 @@ print result;
 Output:
 
 120.0
+
 How it works
 source text  --Lexer-->  List<Token>  --Parser-->  AST (List<Stmt>)  --Interpreter-->  output
 The lexer turns text into tokens.
 The parser turns tokens into a tree.
 The interpreter walks the tree and runs it.
-
 The lexer
 The lexer reads the source text left to right in a single pass and produces a list of tokens. Whitespace is discarded (newlines are counted so errors can report a line number), and every token records the line it appeared on.
 
@@ -42,6 +42,7 @@ Arithmetic	PLUS, MINUS, STAR, SLASH
 Assignment and comparison	ASSIGN (=), EQ (==), LT (<), LE (<=), GT (>), GE (>=)
 Punctuation	LPAREN, RPAREN, LBRACE, RBRACE, SEMICOLON
 End of input	EOF
+
 Design decisions
 Keywords beat identifiers. A word is read as an identifier-shaped lexeme first, then looked up in the keyword table.
 Longest match. ifthen is a single identifier, not if followed by then.
@@ -123,9 +124,13 @@ Output is always printed as a double (120.0, not 120).
 
 Project structure
 programs/
-factorial.toy    example program
+factorial.toy    prints 120.0
+countdown.toy    prints 3.0, 2.0, 1.0
+sum.toy          prints 55.0
+ifelse.toy       prints 1.0
+error.toy        reports a division by zero
 src/main/java/org/example/toylang/
-Main.java        entry point: reads a file, runs it, reports errors
+Main.java        entry point: reads the file given as an argument, runs it, reports errors
 Lexer.java       source text -> list of tokens
 Token.java       a token: type, lexeme, line
 TokenType.java   all token types
@@ -134,28 +139,37 @@ Expr.java        expression nodes
 Stmt.java        statement nodes
 Parser.java      list of tokens -> list of statements (the AST)
 Interpreter.java walks the AST and runs the program
+src/test/java/org/example/toylang/
+ProgramsTest.java  runs every example program and checks its output
+
 Building and running
 Requirements: a JDK that supports records, sealed types and pattern-matching switch (Java 21 or newer). The pom.xml currently targets Java 25; change the source and target values if your JDK is older.
+Run a program by passing its path as the argument:
+java -cp target/classes org.example.toylang.Main programs/factorial.toy
+(Build first with ./mvnw compile; on Windows use mvnw.cmd compile.)
+From IntelliJ: open the project, then in Run -> Edit Configurations put the program path (for example programs/sum.toy) in Program arguments and run Main.
 
-From IntelliJ: open the project, then run Main. It reads programs/factorial.toy relative to the project root.
+Testing
+Every example program has a test in ProgramsTest. Each test runs a program through Main, captures what it prints, and compares it with the expected output.
+./mvnw test
 
-From the command line, using the bundled Maven wrapper:
-
-./mvnw compile
-(On Windows, use mvnw.cmd compile.)
+Program	Expected output	Covers
+factorial.toy	120.0	while, *, -, >
+countdown.toy	3.0, 2.0, 1.0	a loop printing several lines
+sum.toy	55.0	<=, +, running totals
+ifelse.toy	1.0	if/else
+error.toy	Error on line 1: Division by zero	runtime errors with line numbers
 
 Errors
 A broken program reports the line it failed on:
-
 print 1 / 0;
 Error on line 1: Division by zero
 
 Roadmap
-Command-line argument: pass the program file as an argument instead of a fixed path.
-More example programs in programs/: countdown, sum, if/else, error cases.
-Tests: run each example and check its output with a single command.
 Unary minus: finish unary() so -5 works.
 Line numbers on variables for better undefined-variable errors.
+Whole-number output: print 120 instead of 120.0.
+More tests: unit tests for the lexer and parser, and for error cases.
 Possible extensions: functions, a type checker, compiling to bytecode for a small virtual machine, and simple optimisations such as constant folding.
 
 
