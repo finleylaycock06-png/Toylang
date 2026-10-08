@@ -2,18 +2,18 @@
 Toylang
 A small programming language written in Java, built from scratch as a learning project: a lexer, a parser and a tree-walking interpreter.
 
-The goal is to understand how a compiler front end works by building every stage by hand, without parser generators.
+The goal is to understand how a language implementation works by building every stage by hand, without parser generators.
 
 Status
-Lexer (tokens, keywords, operators, line tracking, error reporting)   x
-AST (expression and statement nodes)    x
-Parser (recursive descent, operator precedence, statements)    x
-Interpreter
-Test suite and example programs
-
-
-Planned language
-The language is deliberately small: arithmetic, variables, comparisons, if/else, while, blocks and print.
+Lexer (tokens, keywords, operators, line tracking, error reporting)
+AST (expression and statement nodes)
+Parser (recursive descent, operator precedence, statements)
+Interpreter (tree-walking evaluator with a variable store)
+Runs programs from a file, with line-numbered error messages
+More example programs and a test suite
+Unary minus
+The language
+Arithmetic, variables, comparisons, if/else, while, blocks and print. Every statement ends with ;. All numbers are doubles.
 
 n = 5;
 result = 1;
@@ -22,13 +22,15 @@ result = result * n;
 n = n - 1;
 }
 print result;
-At the moment programs can be tokenised and parsed into a tree, but not yet run. The interpreter is the next stage.
+Output:
 
+120.0
 How it works
 source text  --Lexer-->  List<Token>  --Parser-->  AST (List<Stmt>)  --Interpreter-->  output
 The lexer turns text into tokens.
 The parser turns tokens into a tree.
-The interpreter (not yet written) walks the tree and runs it.
+The interpreter walks the tree and runs it.
+
 The lexer
 The lexer reads the source text left to right in a single pass and produces a list of tokens. Whitespace is discarded (newlines are counted so errors can report a line number), and every token records the line it appeared on.
 
@@ -40,16 +42,12 @@ Arithmetic	PLUS, MINUS, STAR, SLASH
 Assignment and comparison	ASSIGN (=), EQ (==), LT (<), LE (<=), GT (>), GE (>=)
 Punctuation	LPAREN, RPAREN, LBRACE, RBRACE, SEMICOLON
 End of input	EOF
-Lexical rules
-Numbers: a non-empty run of digits.
-Identifiers: start with a letter, followed by any letters, digits or _.
-Keywords: looked up in a table after an identifier-shaped word has been read.
-Unexpected characters (for example @) raise a LangError with the line number.
 Design decisions
-Keywords beat identifiers. A word is read as an identifier-shaped lexeme first, then looked up in the keyword table. If it is found, it becomes a keyword token; otherwise it is an IDENT.
-Longest match. A word is read for as long as it continues to match, so ifthen is a single identifier rather than the keyword if followed by then.
-One character of lookahead. Operators that may be one or two characters (=/==, </<=, >/>=) are decided by peeking at the next character. A helper, match, consumes that character only when it is the expected one, so a failed check never swallows input.
+Keywords beat identifiers. A word is read as an identifier-shaped lexeme first, then looked up in the keyword table.
+Longest match. ifthen is a single identifier, not if followed by then.
+One character of lookahead. =/==, </<= and >/>= are decided by peeking at the next character. The match helper consumes it only when it is the expected one.
 Single pass, left to right. The lexer never backtracks.
+Unexpected characters (for example @) raise a LangError with the line number.
 The AST
 The tree nodes are Java records inside two sealed interfaces: Expr (things that produce a value) and Stmt (things that perform an action).
 
@@ -63,13 +61,15 @@ Stmt	Assign, Print, If, While, Block
       1   *                +   3
          / \              / \
         2   3            1   2
+
 Design decisions
-No node for brackets. Grouping is recorded by the shape of the tree: whatever sits lower is evaluated first.
-Sealed interfaces. Every node kind is known up front, so the interpreter's switch can be checked for completeness.
+No node for brackets. Grouping is recorded by the shape of the tree.
+Sealed interfaces. Every node kind is known up front, so the compiler checks that the interpreter's switch covers all of them.
 Operators are stored as tokens, so error messages can report the line they came from.
 "No else" is null. An If node's elseBranch is null when the else is absent.
+
 The parser
-A hand-written recursive descent parser: one method per grammar rule. It reads the token list and builds the AST, and it reports syntax errors with a line number.
+A hand-written recursive descent parser: one method per grammar rule.
 
 Grammar
 program     → statement* EOF
@@ -89,32 +89,43 @@ primary     → NUMBER | IDENT | "(" expression ")"
 unary is currently a pass-through, so negative literals such as -5 are not supported yet. Write 0 - 5 instead.
 
 Operator precedence
-Each precedence level is its own rule, and each rule calls the next-tighter one. That is what makes * bind tighter than +, and + tighter than <. From loosest to tightest:
+Each precedence level is its own rule, and each rule calls the next-tighter one. From loosest to tightest:
 
 Level	Operators
 comparison	< <= > >= ==
 term	+ -
 factor	* /
 primary	numbers, variables, brackets
+
 Design decisions
-Loops give left-to-right grouping. Each binary level uses a while loop that wraps everything so far as the new left child, so 10 - 3 - 2 parses as (10 - 3) - 2.
-Recursion handles nesting. primary calls expression for bracketed input, and block calls statement, so brackets and blocks nest to any depth.
-else attaches to the nearest if. The inner call to ifStatement() sees the else first, as in C and Java.
-Helper methods (peek, advance, match, check, consume) mirror the lexer's character helpers, but work on tokens.
+Loops give left-to-right grouping. 10 - 3 - 2 parses as (10 - 3) - 2.
+Recursion handles nesting. primary calls expression for brackets, and block calls statement.
+else attaches to the nearest if, as in C and Java.
 Errors carry a line number. consume throws a LangError naming the expected token and the line.
-Example
-Input:
 
-if (x < 1) print x; else print 0;
-Tree (simplified):
+The interpreter
+A tree-walking interpreter: it runs a program by walking the AST directly, with no bytecode or compilation step. It has two methods and a variable store.
 
-If
-├─ condition: Binary( Var x, <, Num 1 )
-├─ then:      Print( Var x )
-└─ else:      Print( Num 0 )
+Part	Role
+evaluate(Expr)	Recursive. Works out an expression tree and returns a double.
+execute(Stmt)	Runs one statement. Returns nothing; it prints or changes the variables.
+variables	A Map<String, Double> holding the current value of every variable.
+
+Design decisions
+One number type. Every value is a double, so there is no type checking to do.
+Booleans are numbers. Comparisons give 1.0 (true) or 0.0 (false), and if/while treat any non-zero value as true.
+while re-evaluates its condition every pass, so changes made in the body are seen.
+Pattern-matching switch over sealed types. Adding a new node type without handling it in the interpreter is a compile error.
+Runtime errors (division by zero, undefined variable) raise a LangError, reported as Error on line N: message.
+Known limitations
+Undefined-variable errors report line 0, because Var nodes do not store a line number yet.
+Output is always printed as a double (120.0, not 120).
+
 Project structure
+programs/
+factorial.toy    example program
 src/main/java/org/example/toylang/
-Main.java        entry point
+Main.java        entry point: reads a file, runs it, reports errors
 Lexer.java       source text -> list of tokens
 Token.java       a token: type, lexeme, line
 TokenType.java   all token types
@@ -122,22 +133,29 @@ LangError.java   error type carrying a line number
 Expr.java        expression nodes
 Stmt.java        statement nodes
 Parser.java      list of tokens -> list of statements (the AST)
-The interpreter file will be added in the next stage.
-
+Interpreter.java walks the AST and runs the program
 Building and running
-Requirements: a JDK that supports records and sealed types (Java 17 or newer). The pom.xml currently targets Java 25; change the source and target values if your JDK is older.
+Requirements: a JDK that supports records, sealed types and pattern-matching switch (Java 21 or newer). The pom.xml currently targets Java 25; change the source and target values if your JDK is older.
 
-From IntelliJ: open the project, then run Main.
+From IntelliJ: open the project, then run Main. It reads programs/factorial.toy relative to the project root.
 
 From the command line, using the bundled Maven wrapper:
 
 ./mvnw compile
 (On Windows, use mvnw.cmd compile.)
 
+Errors
+A broken program reports the line it failed on:
+
+print 1 / 0;
+Error on line 1: Division by zero
+
 Roadmap
-Interpreter: a tree-walking evaluator with a variable store (Map<String, Double>).
-Command-line entry point: read a program from a file passed as an argument.
-Tests: example programs with expected output, run by a single command.
+Command-line argument: pass the program file as an argument instead of a fixed path.
+More example programs in programs/: countdown, sum, if/else, error cases.
+Tests: run each example and check its output with a single command.
 Unary minus: finish unary() so -5 works.
+Line numbers on variables for better undefined-variable errors.
 Possible extensions: functions, a type checker, compiling to bytecode for a small virtual machine, and simple optimisations such as constant folding.
+
 
